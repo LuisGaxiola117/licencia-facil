@@ -1,0 +1,2 @@
+// Este archivo asegura que la base de datos SQLite se cree en la carpeta backend
+// No es necesario modificarlo, la base se crea automáticamente al iniciar el servidor.
