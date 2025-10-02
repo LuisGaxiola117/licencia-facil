@@ -2,11 +2,44 @@ const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcrypt');
 const cors = require('cors');
+const crypto = require('crypto');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const app = express();
 const PORT = 4000;
 
+// Seguridad HTTP headers
+app.use(helmet());
+
+// Limitar peticiones para evitar ataques de fuerza bruta y DDoS
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 100, // máximo 100 peticiones por IP
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(limiter);
+
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' })); // Aumenta el límite para imágenes grandes
+
+// Clave y vector de inicialización para AES (en producción usa variables de entorno)
+const AES_KEY = crypto.scryptSync('supersecreto123', 'salt', 32); // 32 bytes para AES-256
+const AES_IV = Buffer.alloc(16, 0); // IV fijo para ejemplo
+
+function encryptAES(text) {
+  const cipher = crypto.createCipheriv('aes-256-cbc', AES_KEY, AES_IV);
+  let encrypted = cipher.update(text, 'utf8', 'base64');
+  encrypted += cipher.final('base64');
+  return encrypted;
+}
+
+function decryptAES(encrypted) {
+  const decipher = crypto.createDecipheriv('aes-256-cbc', AES_KEY, AES_IV);
+  let decrypted = decipher.update(encrypted, 'base64', 'utf8');
+  decrypted += decipher.final('utf8');
+  return decrypted;
+}
 
 // Conexión a la base de datos SQLite
 const db = new sqlite3.Database('./users.db', (err) => {
@@ -34,12 +67,17 @@ db.run(createTable);
 app.post('/register', async (req, res) => {
   const { name, dob, gender, email, phone, password, license } = req.body;
   if (!name || !dob || !gender || !email || !phone || !password) {
-    return res.status(400).json({ message: 'Todos los campos son obligatorios.' });
+    return res.status(400).json({ message: 'Todos los campos son obligatorios. ( ͡❛ ⏥ ͡❛)'});
   }
   const hashedPassword = await bcrypt.hash(password, 10);
+  // Cifrar la imagen de licencia si existe
+  let encryptedLicense = null;
+  if (license) {
+    encryptedLicense = encryptAES(license);
+  }
   db.run(
     `INSERT INTO users (name, dob, gender, email, phone, password, license) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [name, dob, gender, email, phone, hashedPassword, license],
+    [name, dob, gender, email, phone, hashedPassword, encryptedLicense],
     function (err) {
       if (err) {
         if (err.message.includes('UNIQUE')) {
@@ -50,6 +88,21 @@ app.post('/register', async (req, res) => {
       res.status(201).json({ message: 'Usuario registrado correctamente.' });
     }
   );
+// Endpoint para obtener la imagen de licencia descifrada
+app.get('/license/:email', (req, res) => {
+  const { email } = req.params;
+  db.get('SELECT license FROM users WHERE email = ?', [email], (err, row) => {
+    if (err || !row || !row.license) {
+      return res.status(404).json({ message: 'No encontrada' });
+    }
+    try {
+      const decrypted = decryptAES(row.license);
+      res.json({ license: decrypted });
+    } catch {
+      res.status(500).json({ message: 'Error al descifrar' });
+    }
+  });
+});
 });
 
 // Login

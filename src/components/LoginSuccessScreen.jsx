@@ -10,8 +10,8 @@ function LoginSuccessScreen({ onLogout }) {
         <iframe
           width="700"
           height="394"
-          src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1"
-          title="Rick Astley - Never Gonna Give You Up"
+          src="https://www.youtube.com/embed/YOGMxVISTW0?autoplay=1"
+          title="Nuevo video"
           frameBorder="0"
           allow="autoplay; encrypted-media"
           allowFullScreen

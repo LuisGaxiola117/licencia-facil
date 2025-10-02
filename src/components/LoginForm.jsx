@@ -2,6 +2,7 @@
   import DataSecurityModal from './DataSecurityModal';
   import LegalModal from './LegalModal';
   import LoginSuccessScreen from './LoginSuccessScreen';
+   import ErrorModal from './ErrorModal';
 
   function IdentityVerificationForm() {
     const [showSecurityModal, setShowSecurityModal] = useState(false);
@@ -22,6 +23,7 @@
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+  const [showErrorModal, setShowErrorModal] = useState(false);
 
     const handleFileChange = (e) => {
       const selected = e.target.files[0];
@@ -44,7 +46,14 @@
       setError('');
       setSuccess('');
       setLoading(true);
+      // Validación para ambos: login y registro
       if (isLogin) {
+        if (!form.correo || !form.password) {
+          setError('Todos los campos son obligatorios. ( ͡❛ ⏥ ͡❛)');
+          setShowErrorModal(true);
+          setLoading(false);
+          return;
+        }
         // LOGIN
         try {
           const res = await fetch('http://localhost:4000/login', {
@@ -61,6 +70,7 @@
             setLoggedIn(true);
           } else {
             setError(data.message || 'Error al iniciar sesión');
+            if (data.message && data.message.includes('⏥')) setShowErrorModal(true);
           }
         } catch (err) {
           setError('Error de conexión con el servidor');
@@ -69,8 +79,9 @@
         return;
       }
       // REGISTRO
-      if (!file) {
-        setError('Debes subir una foto de tu licencia');
+      if (!form.nombre || !form.fecha || !form.genero || !form.correo || !form.telefono || !form.password || !file) {
+        setError('Todos los campos son obligatorios. ( ͡❛ ⏥ ͡❛)');
+        setShowErrorModal(true);
         setLoading(false);
         return;
       }
@@ -108,6 +119,7 @@
           setSuccess('¡Usuario registrado correctamente!');
         } else {
           setError(data.message || 'Error al registrar');
+          if (data.message && data.message.includes('⏥')) setShowErrorModal(true);
         }
       } catch (err) {
         setError('Error de conexión con el servidor');
@@ -162,17 +174,17 @@
               <div style={{display:'flex',gap:24,flexWrap:'wrap',marginBottom:18}}>
                 <div style={{flex:1,minWidth:180}}>
                   <label style={{fontWeight:600,display:'block',marginBottom:4}}>Nombre completo</label>
-                  <input name="nombre" value={form.nombre} onChange={handleChange} type="text" placeholder="Nombre(s) y apellidos" required />
+                  <input name="nombre" value={form.nombre} onChange={handleChange} type="text" placeholder="Nombre(s) y apellidos" />
                 </div>
                 <div style={{flex:1,minWidth:120}}>
                   <label style={{fontWeight:600,display:'block',marginBottom:4}}>Fecha de nacimiento</label>
-                  <input name="fecha" value={form.fecha} onChange={handleChange} type="date" required />
+                  <input name="fecha" value={form.fecha} onChange={handleChange} type="date" />
                 </div>
               </div>
               <div style={{display:'flex',gap:24,flexWrap:'wrap',marginBottom:18}}>
                 <div style={{flex:1,minWidth:120}}>
                   <label style={{fontWeight:600,display:'block',marginBottom:4}}>Género</label>
-                  <select name="genero" value={form.genero} onChange={handleChange} required style={{width:'100%',padding:'10px',borderRadius:8,border:'1.5px solid #d1d5db',background:'#f8fafc'}}>
+                  <select name="genero" value={form.genero} onChange={handleChange} style={{width:'100%',padding:'10px',borderRadius:8,border:'1.5px solid #d1d5db',background:'#f8fafc'}}>
                     <option value="">Selecciona</option>
                     <option value="masculino">Masculino</option>
                     <option value="femenino">Femenino</option>
@@ -181,11 +193,11 @@
                 </div>
                 <div style={{flex:1,minWidth:180}}>
                   <label style={{fontWeight:600,display:'block',marginBottom:4}}>Correo electrónico</label>
-                  <input name="correo" value={form.correo} onChange={handleChange} type="email" placeholder="ejemplo@correo.com" required />
+                  <input name="correo" value={form.correo} onChange={handleChange} type="email" placeholder="ejemplo@correo.com" />
                 </div>
                 <div style={{flex:1,minWidth:140}}>
                   <label style={{fontWeight:600,display:'block',marginBottom:4}}>Teléfono</label>
-                  <input name="telefono" value={form.telefono} onChange={handleChange} type="tel" placeholder="10 dígitos" pattern="[0-9]{10}" required />
+                  <input name="telefono" value={form.telefono} onChange={handleChange} type="tel" placeholder="10 dígitos" pattern="[0-9]{10}" />
                 </div>
               </div>
             </>
@@ -193,12 +205,12 @@
           {isLogin && (
             <div style={{marginBottom:18}}>
               <label style={{fontWeight:600,display:'block',marginBottom:4}}>Correo electrónico</label>
-              <input name="correo" value={form.correo} onChange={handleChange} type="email" placeholder="ejemplo@correo.com" required />
+              <input name="correo" value={form.correo} onChange={handleChange} type="email" placeholder="ejemplo@correo.com" />
             </div>
           )}
           <div style={{marginBottom:18}}>
             <label style={{fontWeight:600,display:'block',marginBottom:4}}>Contraseña</label>
-            <input name="password" value={form.password} onChange={handleChange} type="password" placeholder="Contraseña" required />
+            <input name="password" value={form.password} onChange={handleChange} type="password" placeholder="Contraseña" />
           </div>
           {!isLogin && (
             <div style={{display: 'flex', flexDirection: 'row', alignItems: 'center', marginBottom: 18, gap: 18}}>
@@ -219,7 +231,6 @@
                   type="file"
                   accept="image/*,application/pdf"
                   onChange={handleFileChange}
-                  required
                   style={{marginBottom: 0, width: '100%'}}
                 />
               </div>
@@ -229,9 +240,10 @@
             {loading ? 'Enviando...' : isLogin ? 'Iniciar sesión' : 'Crear cuenta y verificar identidad'}
           </button>
         </form>
-        {error && (
-          <div style={{marginTop: 12, color: '#e53e3e', fontWeight: 500, textAlign: 'center'}}>{error}</div>
-        )}
+        {showErrorModal
+          ? <ErrorModal message={error} onClose={() => setShowErrorModal(false)} />
+          : error && <div style={{marginTop: 12, color: '#e53e3e', fontWeight: 500, textAlign: 'center'}}>{error}</div>
+        }
         {success && (
           <div style={{marginTop: 12, color: '#2563eb', fontWeight: 500, textAlign: 'center'}}>{success}</div>
         )}
