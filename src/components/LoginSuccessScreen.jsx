@@ -1,10 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
-function LoginSuccessScreen({ onLogout }) {
+function LoginSuccessScreen({ onLogout, user }) {
   const [password, setPassword] = useState('');
   const [method, setMethod] = useState('sha256');
   const [output, setOutput] = useState('');
   const [working, setWorking] = useState(false);
+  const [decryptedLicense, setDecryptedLicense] = useState(null);
+  const [encryptedRaw, setEncryptedRaw] = useState(null);
+  const [algoUsed, setAlgoUsed] = useState(null);
+  const [loadingLicense, setLoadingLicense] = useState(false);
+  const [licenseError, setLicenseError] = useState('');
 
   const enc = new TextEncoder();
   const bufToHex = (buffer) => Array.from(new Uint8Array(buffer)).map(b => b.toString(16).padStart(2,'0')).join('');
@@ -59,12 +64,58 @@ function LoginSuccessScreen({ onLogout }) {
     }
   }
 
+  useEffect(() => {
+    // If we have a user email, try to fetch the decrypted license from backend
+    if (!user || !user.email) return;
+    let mounted = true;
+    (async () => {
+      setLoadingLicense(true);
+      setLicenseError('');
+      try {
+        const res = await fetch(`http://localhost:4000/license/${encodeURIComponent(user.email)}`);
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          throw new Error(d.message || `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        if (mounted) {
+          setDecryptedLicense(data.license || null);
+          setEncryptedRaw(data.encrypted || null);
+          setAlgoUsed(data.algo || null);
+        }
+      } catch (err) {
+        if (mounted) setLicenseError(String(err));
+      } finally {
+        if (mounted) setLoadingLicense(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [user]);
+
   return (
     <div style={{textAlign:'center',marginTop:60}}>
       <h2 style={{color:'#2563eb'}}>¡Bienvenido!</h2>
       <img src="https://cdn-icons-png.flaticon.com/512/190/190411.png" alt="login success" style={{width:180,margin:'32px auto',display:'block'}} />
       <p style={{fontSize:'1.1rem',color:'#374151'}}>Has iniciado sesión correctamente.</p>
       <div style={{margin:'32px auto',maxWidth:700}}>
+        {loadingLicense ? (
+          <div style={{marginBottom:12,color:'#2563eb'}}>Cargando imagen de licencia...</div>
+        ) : licenseError ? (
+          <div style={{marginBottom:12,color:'#e53e3e'}}>No fue posible obtener la licencia: {licenseError}</div>
+        ) : decryptedLicense ? (
+          <div style={{marginBottom:12,textAlign:'center'}}>
+            <div style={{fontWeight:600,marginBottom:8}}>Tu licencia (descifrada)</div>
+            <img src={decryptedLicense} alt="Licencia descifrada" style={{maxWidth:'100%',height:'auto',borderRadius:8,boxShadow:'0 6px 18px rgba(0,0,0,0.12)'}} />
+            {encryptedRaw && (
+              <div style={{marginTop:12,textAlign:'left',width:'100%'}}>
+                <div style={{fontWeight:600,marginBottom:6}}>Representación cifrada (raw)</div>
+                <div style={{fontSize:12,color:'#475569',marginBottom:6}}>Algoritmo: {algoUsed || 'desconocido'}</div>
+                <pre style={{whiteSpace:'pre-wrap',wordBreak:'break-word',background:'#0f172a',color:'#e6eef8',padding:12,borderRadius:6,overflowX:'auto'}}>{encryptedRaw}</pre>
+                <div style={{fontSize:12,color:'#6b7280',marginTop:6}}>Formato: iv:tag:ciphertext (para AEAD) o iv:ciphertext para CBC/3DES. Todas las partes están en Base64.</div>
+              </div>
+            )}
+          </div>
+        ) : null}
         <div style={{textAlign:'left',color:'#374151',lineHeight:1.6}}>
           <h4 style={{marginTop:12}}>SHA‑256 / SHA‑384 / SHA‑512</h4>
           <p>Son funciones que crean una "huella" de cualquier dato. Son muy rápidas y buenas para verificar archivos, pero por ser rápidas no son adecuadas por sí solas para proteger contraseñas: un atacante puede probar muchas contraseñas por segundo.</p>

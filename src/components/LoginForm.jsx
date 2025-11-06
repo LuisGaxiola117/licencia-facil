@@ -11,6 +11,7 @@
     const [rejected, setRejected] = useState(false);
     const [showLegal, setShowLegal] = useState(true);
     const [loggedIn, setLoggedIn] = useState(false);
+    const [loggedUser, setLoggedUser] = useState(null);
     const [form, setForm] = useState({
       nombre: '',
       fecha: '',
@@ -18,6 +19,7 @@
       correo: '',
       telefono: '',
       password: '',
+      tipo: ''
     });
     const [isLogin, setIsLogin] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -68,6 +70,7 @@
           if (res.ok) {
             setSuccess('¡Login exitoso!');
             setLoggedIn(true);
+            setLoggedUser(data.user || { email: form.correo });
           } else {
             setError(data.message || 'Error al iniciar sesión');
             if (data.message && data.message.includes('⏥')) setShowErrorModal(true);
@@ -111,7 +114,8 @@
             email: form.correo,
             phone: form.telefono,
             password: form.password,
-            license: licenseBase64
+            license: licenseBase64,
+            tipo: form.tipo
           })
         });
         const data = await res.json();
@@ -149,8 +153,9 @@
     }
 
     if (loggedIn) {
-      return <LoginSuccessScreen onLogout={() => {
+      return <LoginSuccessScreen user={loggedUser} onLogout={() => {
         setLoggedIn(false);
+        setLoggedUser(null);
         setForm({ ...form, password: '' });
         setIsLogin(true);
         setSuccess('');
@@ -194,6 +199,19 @@
                 <div style={{flex:1,minWidth:180}}>
                   <label style={{fontWeight:600,display:'block',marginBottom:4}}>Correo electrónico</label>
                   <input name="correo" value={form.correo} onChange={handleChange} type="email" placeholder="ejemplo@correo.com" />
+                </div>
+                <div style={{flex:1,minWidth:140}}>
+                  <label style={{fontWeight:600,display:'block',marginBottom:4}}>Algoritmo de cifrado</label>
+                  <select name="tipo" value={form.tipo} onChange={handleChange} style={{width:'100%',padding:'10px',borderRadius:8,border:'1.5px solid #d1d5db',background:'#fff'}}>
+                    <option value="">Selecciona</option>
+                    <option value="aes-128-gcm">AES‑128 GCM (recomendado, AEAD)</option>
+                    <option value="aes-256-gcm">AES‑256 GCM (recomendado, AEAD)</option>
+                    <option value="aes-128-cbc">AES‑128 CBC (confidencialidad)</option>
+                    <option value="aes-256-cbc">AES‑256 CBC (confidencialidad)</option>
+                    <option value="des-ede3-cbc">3DES (des-ede3-cbc) — legado</option>
+                    <option value="chacha20-poly1305">ChaCha20‑Poly1305 (AEAD, si está disponible)</option>
+                  </select>
+                  <small style={{display:'block',marginTop:6,color:'#6b7280'}}>Preferir AES‑GCM o ChaCha20‑Poly1305 por integridad y confidencialidad.</small>
                 </div>
                 <div style={{flex:1,minWidth:140}}>
                   <label style={{fontWeight:600,display:'block',marginBottom:4}}>Teléfono</label>
